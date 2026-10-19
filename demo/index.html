@@ -44,7 +44,7 @@ button{min-height:44px;min-width:44px}.close{width:44px;height:44px}
 <p>기존 기록은 유지하고 동일한 기록은 건너뜁니다. Safari 데이터를 지우지 않은 상태에서도 가져오기를 시험할 수 있어요.</p>
 <p>백업에는 저장한 시점까지의 기록만 담겨요. 새 기록이 쌓이면 다시 백업해 주세요. 파일은 암호화되지 않으며 감정과 메모가 포함되니 안전하게 보관하세요. 이 파일은 <strong>브라우저 데모 전용</strong>입니다.</p>
 </details></div></details></main>
-<main class="view" id="insights"><div class="eyebrow">마음 돌아보기</div><h1 class="h1">감정의 흐름</h1><p class="intro">기록한 순간을 기준으로만 살펴봐요.</p><div class="stats"><div class="stat"><span class="muted">기록한 순간</span><b id="statTotal">0</b></div><div class="stat"><span class="muted">기록한 감정 종류</span><b id="statKinds">0</b></div></div><div class="notecard"><h3>자주 기록한 감정</h3><div id="statsContent" class="muted">아직 기록이 없어요.</div></div><div class="notecard"><h3>오늘의 성찰 질문</h3><p id="reflection">오늘 느꼈던 감정 중 말로 표현하기 어려웠던 건 무엇인가요?</p></div><p class="quiet">기록의 흐름을 보여주는 통계예요. AI 분석이나 감정 진단은 제공하지 않아요.</p></main>
+<main class="view" id="insights"><div class="eyebrow">마음 돌아보기</div><h1 class="h1">감정의 흐름</h1><p class="intro">기록한 순간을 기준으로만 살펴봐요.</p><label for="insightDays">분석 기간</label><select id="insightDays" style="min-height:44px;margin:12px;padding:8px;font:inherit"><option value="7">최근 7일</option><option value="30">최근 30일</option></select><div class="stats"><div class="stat"><span class="muted">감정 기록</span><b id="statTotal">0</b></div><div class="stat"><span class="muted">기록한 날</span><b id="statKinds">0</b></div></div><div class="notecard"><h3>내 기록 요약</h3><p class="muted">기기 안에서 집계한 요약 · AI 없이도 사용할 수 있어요.</p><div id="basicSummary" aria-live="polite"></div></div><div class="notecard"><h3>기록에 남긴 감정</h3><div id="statsContent" class="muted"></div><p class="muted">주 감정을 한 기록당 1회 집계해요. 감정을 느낀 전체 시간이나 횟수는 아니에요.</p></div><div class="notecard"><h3>오늘의 성찰 질문</h3><p id="reflection"></p><p class="muted">답변은 의무가 아니에요. 떠올려 보기만 해도 돼요.</p></div><p class="quiet">서버 전송 없이 이 기기에서 계산해요. 생성형 AI나 감정 진단이 아닌 기록 기반 요약이에요.</p></main>
 </div><nav class="tabbar" aria-label="하단 탐색"><button type="button" data-tab="today" class="active" aria-current="page"><span class="tabicon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span><span>오늘</span></button><button type="button" data-tab="history"><span class="tabicon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 3v18m3-13h4m-4 4h4m-4 4h2M3 7h3m-3 5h3m-3 5h3"/></svg></span><span>기록</span></button><button type="button" data-tab="insights"><span class="tabicon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18c5 0 4-12 9-12 3 0 3 6 7 6M4 21h16"/><circle cx="13" cy="6" r="2"/><circle cx="4" cy="18" r="1.5"/></svg></span><span>마음 분석</span></button></nav>
 <div class="modalwrap" id="modalwrap" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialogTitle"><div class="modalhead"><strong id="dialogTitle">감정카드</strong><button type="button" class="close" id="close" aria-label="닫기">×</button></div><div id="modalcontent"></div></section></div>
 <script>
@@ -135,7 +135,40 @@ function confirmRecordDeletion(record){
  $('#cancelDelete').focus();
 }
 function renderHistory(){let area=$('#entries');area.replaceChildren();if(!entries.length){area.append(el('div','empty','아직 기록이 없어요. 첫 카드를 펼쳐보세요.'));return}entries.forEach((r,i)=>{let card=el('div','entry');let row=el('div','row');let box=el('div');box.append(el('h3','',r.emoji+' '+r.title),el('div','muted',new Date(r.date).toLocaleString('ko-KR')));let del=el('button','del','삭제');del.addEventListener('click',()=>confirmRecordDeletion(r));row.append(box,del);card.append(row);let extras=[...r.details,...r.comp,r.context,r.intensity?'강도 '+r.intensity+'/5':''].filter(Boolean);if(extras.length)card.append(el('p','muted',extras.join(' · ')));if(r.note)card.append(el('p','',r.note));area.append(card)})}
-function renderInsights(){let counts={};entries.forEach(r=>{counts[r.title]=(counts[r.title]||0)+1});let sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);$('#statTotal').textContent=entries.length;$('#statKinds').textContent=sorted.length;let area=$('#statsContent');area.replaceChildren();if(!sorted.length){area.textContent='아직 기록이 없어요.';$('#reflection').textContent='오늘 느꼈던 감정 중 말로 표현하기 어려웠던 건 무엇인가요?';return;}sorted.forEach(([name,count])=>{let row=el('div','statline');row.append(el('span','name',name));let bar=el('div','bar'),inner=el('span');inner.style.width=count/entries.length*100+'%';bar.append(inner);row.append(bar,el('span','number',count+'건'));area.append(row)});$('#reflection').textContent=entries.length<5?'지금은 기록이 적어 반복 패턴을 판단하기 어려워요. 비슷한 날들의 차이를 차근차근 살펴보세요.':'가장 자주 기록한 감정은 '+sorted[0][0]+'이에요. 이 감정을 기록하지 않았던 비슷한 상황도 있었나요?'}
+function summarizeLocal(rows,days,now=new Date()){
+ const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-(days-1));
+ const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+1);
+ const prevStart=new Date(start);prevStart.setDate(prevStart.getDate()-days);
+ const recent=rows.filter(r=>new Date(r.date)>=start&&new Date(r.date)<end);
+ const previous=rows.filter(r=>new Date(r.date)>=prevStart&&new Date(r.date)<start);
+ const dayCount=a=>new Set(a.map(r=>{const d=new Date(r.date);return [d.getFullYear(),d.getMonth(),d.getDate()].join('-')})).size;
+ const tally=values=>{const m=new Map();values.forEach(x=>m.set(x,(m.get(x)||0)+1));return [...m].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:a[0]>b[0]?1:0))};
+ const counts=tally(recent.map(r=>r.title)),details=tally(recent.flatMap(r=>[...new Set(r.details)])),contexts=tally(recent.map(r=>r.context).filter(Boolean));
+ const intensities=recent.map(r=>r.intensity).filter(x=>Number.isInteger(x)&&x>=1&&x<=5),lines=[];
+ if(!recent.length)lines.push('아직 이 기간의 기록이 없어요. 다른 기간을 고르거나 오늘의 마음을 남겨 보세요.');
+ else{
+  lines.push(`최근 ${days}일 중 ${dayCount(recent)}일에 ${recent.length}건을 기록했어요. 그중 메모를 남긴 기록은 ${recent.filter(r=>r.note.trim()).length}건이에요.`);
+  lines.push(`가장 많이 남긴 주 감정: ${counts.filter(x=>x[1]===counts[0][1]).map(x=>x[0]).join(' · ')} · 각각 ${counts[0][1]}건. 같은 횟수의 감정은 함께 표시해요.`);
+  if(details.length)lines.push('자주 남긴 표현: '+details.slice(0,3).map(x=>`‘${x[0]}’ ${x[1]}건`).join(', ')+'. 한 기록의 같은 표현은 한 번만 세어요.');
+  if(contexts.length)lines.push(`상황을 선택한 ${recent.filter(r=>r.context).length}건 중 ${contexts.filter(x=>x[1]===contexts[0][1]).map(x=>x[0]).join(' · ')}: 각각 ${contexts[0][1]}건. 선택하지 않은 상황은 추측하지 않아요.`);
+  if(intensities.length)lines.push(`강도를 선택한 ${intensities.length}건의 평균은 ${(intensities.reduce((a,b)=>a+b,0)/intensities.length).toFixed(1)}/5예요. 감정의 좋고 나쁨을 나타내는 점수는 아니에요.`);
+  lines.push(previous.length?`직전 ${days}일에는 ${dayCount(previous)}일에 ${previous.length}건, 이번에는 ${dayCount(recent)}일에 ${recent.length}건을 남겼어요. 기록량의 차이이며 마음의 호전·악화를 뜻하지 않아요.`:`직전 ${days}일의 기록이 없어 기간 간 비교는 하지 않아요.`);
+  if(recent.length<5||dayCount(recent)<3)lines.push('아직 기록한 날이나 수가 적어요. 지금은 기록된 사실만 간단히 돌아봐요.');
+ }
+ const question=details.length?`‘${details[0][0]}’이라는 표현을 남긴 순간, 나에게 필요했던 것은 무엇이었나요?`:recent.length?'이 기간의 기록 하나를 골라 보세요. 그 순간의 나에게 어떤 말을 건네고 싶나요?':'오늘의 감정에 이름을 붙인다면 어떤 단어가 떠오르나요?';
+ return {total:recent.length,daysRecorded:dayCount(recent),counts,details,lines,question};
+}
+function renderInsights(){
+ const s=summarizeLocal(entries,Number($('#insightDays').value));
+ $('#statTotal').textContent=s.total;$('#statKinds').textContent=s.daysRecorded+'일';
+ const summary=$('#basicSummary');summary.replaceChildren();s.lines.forEach(t=>summary.append(el('p','',t)));
+ const area=$('#statsContent');area.replaceChildren();
+ if(!s.total)area.textContent='아직 이 기간의 기록이 없어요.';
+ s.counts.forEach(([name,count])=>{const row=el('div','statline');row.append(el('span','name',name));const bar=el('div','bar'),inner=el('span');inner.style.width=count/s.total*100+'%';bar.append(inner);row.append(bar,el('span','number',count+'건'));area.append(row)});
+ $('#reflection').textContent=s.question;
+}
+$('#insightDays').addEventListener('change',renderInsights);
+
 for(const b of document.querySelectorAll('[data-tab]'))b.addEventListener('click',()=>nav(b.dataset.tab));$('#close').addEventListener('click',closeModal);wrap.addEventListener('click',e=>{if(e.target===wrap)closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Tab'&&wrap.classList.contains('visible')){const items=[...wrap.querySelectorAll('button,input,textarea,[tabindex]')].filter(x=>!x.disabled&&x.offsetParent!==null);const first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}if(e.key==='Escape'&&wrap.classList.contains('visible'))closeModal()});
 
 const BACKUP_FORMAT='oneul-emotion-card-browser';

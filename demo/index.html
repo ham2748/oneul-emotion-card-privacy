@@ -83,13 +83,14 @@ function persistChange(change){
   storageMessage(message);alert(message);return false;
  }
 }
+let editingRecord=null;
 let entries=[], current=null, selectedDetails=new Set(),selectedCompanions=new Set(),intensity=null,context='',note='',stage='';
 const $=s=>document.querySelector(s);const wrap=$('#modalwrap'),content=$('#modalcontent');
 function el(tag,cls='',txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let returnFocus=null;
 function setModal(title,html){if(!wrap.classList.contains('visible'))returnFocus=document.activeElement;$('#dialogTitle').textContent=title;content.innerHTML=html;wrap.classList.add('visible');document.body.style.overflow='hidden';document.querySelector('.shell').inert=true;document.querySelector('.tabbar').inert=true;$('#close').focus();}
-function closeModal(){wrap.classList.remove('visible');document.body.style.overflow='';current=null;document.querySelector('.shell').inert=false;document.querySelector('.tabbar').inert=false;if(returnFocus?.isConnected)returnFocus.focus()}
+function closeModal(){wrap.classList.remove('visible');document.body.style.overflow='';current=null;editingRecord=null;document.querySelector('.shell').inert=false;document.querySelector('.tabbar').inert=false;if(returnFocus?.isConnected)returnFocus.focus()}
 function nav(id){document.querySelectorAll('.view').forEach(n=>n.classList.toggle('active',n.id===id));document.querySelectorAll('.tabbar button').forEach(n=>{const active=n.dataset.tab===id;n.classList.toggle('active',active);if(active)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});window.scrollTo({top:0,behavior:'instant'});if(id==='history')renderHistory();if(id==='insights')renderInsights();}
 function bind(selector,fn){const n=$(selector);if(n)n.addEventListener('click',fn)}
 $('#date').textContent=new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',weekday:'long'}).format(new Date());
@@ -103,8 +104,31 @@ function showDetail(e,detail=''){stage='detail';setModal('감정 알아보기',`
 function showFront(e){stage='front';setModal('감정카드 앞면',`<div class="studycard" style="--strip:${e.color}"><div class="over">FRONT / 감정의 이름</div><div class="bigface" aria-hidden="true">${e.emoji}</div><h2>${esc(e.title)}</h2><p>${esc(e.meaning)}</p><span class="stripe"></span></div><button class="btn" id="flip">카드 뒷면 살펴보기 ↗</button><button class="btn text" id="nextcard">다른 카드 볼래요</button>`);bind('#flip',()=>showBack(e));bind('#nextcard',closeModal)}
 function showBack(e){stage='back';setModal('감정카드 뒷면',`<div class="eyebrow">BACK / 마음을 알아보기</div><h2 class="h1">${e.emoji} ${esc(e.title)}</h2><div class="notecard"><h3>이런 순간에 느낄 수 있어요</h3><ul>${e.examples.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div><div class="notecard"><h3>나에게 묻는 질문</h3><p>${esc(e.question)}</p></div><p class="quiet">이 예시는 감정을 찾기 위한 참고일 뿐, 나의 감정을 단정하지 않아요.</p><button class="btn" id="record">이 감정이 가까워요 · 기록하기 →</button><button class="btn light" id="backfront">앞면 다시 보기</button>`);bind('#record',()=>openCompose(e));bind('#backfront',()=>showFront(e))}
 const contexts=['일·학업','사람·관계','가족','몸·건강','일상','기타'];
-function openCompose(e,initialDetail=''){current=e;stage='compose';selectedDetails=new Set(initialDetail?[initialDetail]:[]);selectedCompanions=new Set();intensity=null;context='';note='';drawCompose()}
-function drawCompose(){let e=current;setModal('내 마음 기록하기',`<div class="eyebrow">SAVE YOUR MOMENT</div><h2 class="h1">${e.emoji} ${esc(e.title)}</h2><p class="intro">모든 항목을 채울 필요는 없어요. 감정만 선택해도 저장할 수 있어요.</p><label class="formlabel">조금 더 가까운 표현 (여러 개 가능)</label><div class="chips" id="detailChips"></div><p class="muted">직접 추가한 표현은 ×를 누르면 삭제돼요.</p><label class="formlabel" for="custom">없는 표현은 내 말로 쓰기</label><div class="search"><input id="custom" maxlength="24" placeholder="예: 씁쓸함"><button id="addcustom" type="button">추가</button></div><label class="formlabel">다른 감정도 함께 있나요?</label><div class="chips" id="compChips"></div><label class="formlabel">지금 느끼는 강도 (선택)</label><div class="strength" id="strengthChips"></div><label class="formlabel">어떤 상황이었나요? (선택)</label><div class="chips" id="contextChips"></div><label class="formlabel" for="note">한 줄로 남기기 (선택)</label><textarea class="memo" id="note" maxlength="600" placeholder="어떤 일이 있었나요?"></textarea><button class="btn" id="save">이 순간 기록하기 ✓</button>`);
+function openCompose(e,initialDetail=''){editingRecord=null;current=e;stage='compose';selectedDetails=new Set(initialDetail?[initialDetail]:[]);selectedCompanions=new Set();intensity=null;context='';note='';drawCompose()}
+function openEdit(record){
+ editingRecord=JSON.parse(JSON.stringify(record));
+ current=catalog.find(e=>e.id===record.id)||{id:record.id,title:record.title,emoji:record.emoji,detailWords:[]};
+ stage='compose';selectedDetails=new Set(record.details);selectedCompanions=new Set(record.comp);
+ intensity=record.intensity;context=record.context;note=record.note;drawCompose();
+}
+function replaceRecord(latest,original,revised){
+ const index=latest.findIndex(r=>JSON.stringify(r)===JSON.stringify(original));
+ if(index<0)throw new Error('Record changed');
+ const next=[...latest];next[index]={...original,...revised,date:original.date};return next;
+}
+function drawCompose(){let e=current;setModal(editingRecord?'기록 수정':'내 마음 기록하기',`<div class="eyebrow">SAVE YOUR MOMENT</div><h2 class="h1">${e.emoji} ${esc(e.title)}</h2><p class="intro">모든 항목을 채울 필요는 없어요. 감정만 선택해도 저장할 수 있어요.</p>${editingRecord?'<p class="muted">처음 기록한 날짜는 유지돼요. 수정 저장을 눌러야 반영돼요.</p><label class="formlabel" for="editEmotion">기록한 감정</label><select id="editEmotion" class="memo" style="min-height:44px;height:auto"></select>':''}<label class="formlabel">조금 더 가까운 표현 (여러 개 가능)</label><div class="chips" id="detailChips"></div><p class="muted">직접 추가한 표현은 ×를 누르면 삭제돼요.</p><label class="formlabel" for="custom">없는 표현은 내 말로 쓰기</label><div class="search"><input id="custom" maxlength="24" placeholder="예: 씁쓸함"><button id="addcustom" type="button">추가</button></div><label class="formlabel">다른 감정도 함께 있나요?</label><div class="chips" id="compChips"></div><label class="formlabel">지금 느끼는 강도 (선택)</label><div class="strength" id="strengthChips"></div><label class="formlabel">어떤 상황이었나요? (선택)</label><div class="chips" id="contextChips"></div><label class="formlabel" for="note">한 줄로 남기기 (선택)</label><textarea class="memo" id="note" maxlength="600" placeholder="어떤 일이 있었나요?"></textarea><button class="btn" id="save">${editingRecord?'수정 저장하기':'이 순간 기록하기 ✓'}</button><button type="button" class="btn text" id="cancelCompose">취소</button>`);
+$('#note').value=note;
+bind('#cancelCompose',closeModal);
+if(editingRecord){
+ const picker=$('#editEmotion');const choices=[...catalog];
+ if(!choices.some(x=>x.id===e.id))choices.push(e);
+ choices.forEach(x=>{const option=el('option','',x.emoji+' '+x.title);option.value=x.id;picker.append(option)});picker.value=e.id;
+ picker.addEventListener('change',()=>{
+  const pending=$('#custom').value.trim();
+  if(pending){if(pending.length>24||/\p{C}/u.test(pending)||selectedDetails.size>=8&&!selectedDetails.has(pending)){picker.value=e.id;alert('직접 입력한 표현을 확인해 주세요.');return;}selectedDetails.add(pending);}
+  note=$('#note').value;current=choices.find(x=>x.id===picker.value);selectedCompanions.delete(current.emoji+' '+current.title);drawCompose();$('#editEmotion').focus();
+ });
+}
 const drawChips=(selector,items,predicate,onClick)=>{let area=$(selector);area.replaceChildren();items.forEach(item=>{let b=el('button','chip'+(predicate(item)?' selected':''),item);b.type='button';b.setAttribute('aria-pressed',String(predicate(item)));b.addEventListener('click',()=>{onClick(item);if(selector==='#detailChips')renderDetails();else drawChips(selector,items,predicate,onClick)});area.append(b)})};
 function dClick(w){if(selectedDetails.has(w))selectedDetails.delete(w);else if(selectedDetails.size<8)selectedDetails.add(w)}
 function renderDetails(){
@@ -123,7 +147,14 @@ drawChips('#compChips',catalog.filter(x=>x.id!==e.id).map(x=>x.emoji+' '+x.title
 drawChips('#strengthChips',['1','2','3','4','5'],w=>intensity===Number(w),w=>{intensity=intensity===Number(w)?null:Number(w)});
 drawChips('#contextChips',contexts,w=>context===w,w=>{context=context===w?'':w});
 $('#addcustom').addEventListener('click',()=>{let w=$('#custom').value.trim();if(!w||w.length>24||/\p{C}/u.test(w)||selectedDetails.size>=8)return;selectedDetails.add(w);$('#custom').value='';renderDetails();$('#custom').focus()});
-$('#save').addEventListener('click',()=>{let newNote=$('#note').value.trim();if(!persistChange(latest=>[{id:e.id,title:e.title,emoji:e.emoji,details:[...selectedDetails],comp:[...selectedCompanions],intensity,context,note:newNote,date:new Date().toISOString()},...latest]))return;closeModal();nav('history')})}
+$('#save').addEventListener('click',()=>{
+ const pending=$('#custom').value.trim();
+ if(pending){if(pending.length>24||/\p{C}/u.test(pending)||selectedDetails.size>=8&&!selectedDetails.has(pending)){alert('표현은 24자 이내, 최대 8개예요.');return;}selectedDetails.add(pending);}
+ if(e.id==='custom'&&!selectedDetails.size){alert('직접 표현은 단어를 하나 이상 남겨 주세요.');return;}
+ const revised={id:e.id,title:e.title,emoji:e.emoji,details:[...selectedDetails],comp:[...selectedCompanions],intensity,context,note:$('#note').value.trim()};
+ if(!persistChange(latest=>editingRecord?replaceRecord(latest,editingRecord,revised):[{...revised,date:new Date().toISOString()},...latest]))return;
+ closeModal();nav('history');
+})}
 function search(){let q=$('#search').value.trim().toLocaleLowerCase('ko');let out=$('#results');out.replaceChildren();if(!q)return;let matches=[];catalog.forEach(e=>e.detailWords.forEach(w=>{if(w.toLocaleLowerCase('ko').includes(q)&&matches.length<18)matches.push({e,w})}));matches.forEach(({e,w})=>{let b=el('button','result');b.append(el('span','',e.emoji+' '+w),el('small','',e.title));b.addEventListener('click',()=>openCard(e,w));out.append(b)});let custom=el('button','result','✍️  “'+q+'” 그대로 기록하기');custom.addEventListener('click',()=>openCompose({id:'custom',title:'직접 표현',emoji:'✍️',detailWords:[],meaning:'나만의 표현',examples:[],question:''},q));out.append(custom)}
 $('#search').addEventListener('input',search);
 function confirmRecordDeletion(record){
@@ -135,7 +166,7 @@ function confirmRecordDeletion(record){
  });
  $('#cancelDelete').focus();
 }
-function renderHistory(){let area=$('#entries');area.replaceChildren();if(!entries.length){area.append(el('div','empty','아직 기록이 없어요. 첫 카드를 펼쳐보세요.'));return}entries.forEach((r,i)=>{let card=el('div','entry');let row=el('div','row');let box=el('div');box.append(el('h3','',r.emoji+' '+r.title),el('div','muted',new Date(r.date).toLocaleString('ko-KR')));let del=el('button','del','삭제');del.addEventListener('click',()=>confirmRecordDeletion(r));row.append(box,del);card.append(row);let extras=[...r.details,...r.comp,r.context,r.intensity?'강도 '+r.intensity+'/5':''].filter(Boolean);if(extras.length)card.append(el('p','muted',extras.join(' · ')));if(r.note)card.append(el('p','',r.note));area.append(card)})}
+function renderHistory(){let area=$('#entries');area.replaceChildren();if(!entries.length){area.append(el('div','empty','아직 기록이 없어요. 첫 카드를 펼쳐보세요.'));return}entries.forEach((r,i)=>{let card=el('div','entry');let row=el('div','row');let box=el('div');box.append(el('h3','',r.emoji+' '+r.title),el('div','muted',new Date(r.date).toLocaleString('ko-KR')));let del=el('button','del','삭제');del.addEventListener('click',()=>confirmRecordDeletion(r));let actions=el('div','record-actions');let edit=el('button','del','수정');edit.style.color='var(--green)';edit.setAttribute('aria-label',r.title+' 기록 수정');edit.addEventListener('click',()=>openEdit(r));actions.style.cssText='display:flex;flex-wrap:wrap;gap:6px;flex-shrink:0';actions.append(edit,del);row.append(box,actions);card.append(row);let extras=[...r.details,...r.comp,r.context,r.intensity?'강도 '+r.intensity+'/5':''].filter(Boolean);if(extras.length)card.append(el('p','muted',extras.join(' · ')));if(r.note)card.append(el('p','',r.note));area.append(card)})}
 function summarizeLocal(rows,days,now=new Date()){
  const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-(days-1));
  const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+1);

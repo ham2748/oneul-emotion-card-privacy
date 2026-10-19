@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='oneul-demo-shell-v14';
+const CACHE='oneul-demo-shell-v15';
 const BASE=new URL('./',self.location.href).href;
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'].map(p=>new URL(p,BASE).href);
 self.addEventListener('install',event=>{
